@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Same shape of CSP the app will ship with (PRD PL-3): only the hosts below are reachable. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' blob:; worker-src blob:; style-src 'unsafe-inline'; img-src data: https://server.arcgisonline.com https://services.arcgisonline.com; connect-src https://overpass-api.de https://maps.mail.ru https://overpass.private.coffee https://api3.geo.admin.ch https://api.opentopodata.org https://services.gugik.gov.pl; form-action 'none'; frame-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' blob:; worker-src blob:; style-src 'unsafe-inline'; img-src data: https://server.arcgisonline.com https://services.arcgisonline.com https://tile.openstreetmap.org https://a.tile.openstreetmap.fr https://tile.opentopomap.org https://a.tile-cyclosm.openstreetmap.fr; connect-src https://overpass-api.de https://maps.mail.ru https://overpass.private.coffee https://api3.geo.admin.ch https://api.opentopodata.org https://services.gugik.gov.pl; form-action 'none'; frame-src 'none'">
 <title>dx-tram – Capability Test</title>
 <style>
   :root {
@@ -36,7 +36,9 @@
   button { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; margin: 4px 8px 4px 0; }
   button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
   textarea { width: 100%; height: 220px; background: var(--code); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; font: 12px/1.4 ui-monospace, Consolas, monospace; }
-  .tiles img { width: 128px; height: 128px; border: 1px solid var(--border); margin: 4px 6px 0 0; background: var(--code); }
+  .tiles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .tiles figure { margin: 0; width: 130px; font-size: 11px; color: var(--muted); }
+  .tiles img { display: block; width: 128px; height: 128px; border: 1px solid var(--border); background: var(--code); }
 </style>
 </head>
 <body>
@@ -63,7 +65,7 @@
   </div>
 
   <h2>Step 3 – Look at the map tiles above</h2>
-  <div class="panel"><p>Four small Warsaw map images should be visible under the Step 1 table (street, gray, dark gray, satellite). A grey box or an "access blocked" picture means the basemap will not work.</p></div>
+  <div class="panel"><p>Eight small Warsaw map images are shown under the Step 1 table, each labelled with its ID. T1-T4 are Esri (expected to work in both modes). T5-T8 are OpenStreetMap-based servers, which ask for a <code>Referer</code>: expected to show a map in online mode and possibly an "access blocked" picture from <code>file://</code>. A blocked tile still loads as a 256x256 picture, so the table cannot tell: <b>please write which IDs show a real map</b> when you paste the report.</p></div>
 
   <h2>Report</h2>
   <div class="panel">
@@ -164,6 +166,11 @@
     ['T2', 'Esri Light Gray Canvas', 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/13/2696/4574'],
     ['T3', 'Esri Dark Gray Canvas', 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/13/2696/4574'],
     ['T4', 'Esri World Imagery', 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/2696/4574'],
+    // OSM-based, volunteer-run; their usage policies ask for an identifying Referer (OSM URL order is z/x/y).
+    ['T5', 'OSM standard', 'https://tile.openstreetmap.org/13/4574/2696.png'],
+    ['T6', 'OSM Humanitarian', 'https://a.tile.openstreetmap.fr/hot/13/4574/2696.png'],
+    ['T7', 'OpenTopoMap', 'https://tile.opentopomap.org/13/4574/2696.png'],
+    ['T8', 'CyclOSM', 'https://a.tile-cyclosm.openstreetmap.fr/cyclosm/13/4574/2696.png'],
   ];
 
   function probeTile(id, name, url) {
@@ -171,10 +178,16 @@
       const img = new Image();
       const t0 = performance.now();
       img.alt = name; img.title = name;
-      img.onload = () => { add('auto', id, 'Tile: ' + name, img.naturalWidth === 256 ? 'OK' : 'WARN', img.naturalWidth + 'x' + img.naturalHeight + ' in ' + Math.round(performance.now() - t0) + ' ms'); resolve(); };
+      // A blocked OSM tile is itself a valid 256x256 picture: loading proves nothing, the eye decides (Step 3).
+      const visual = id >= 'T5' ? ' – check the picture: map or "access blocked"?' : '';
+      img.onload = () => { add('auto', id, 'Tile: ' + name, img.naturalWidth === 256 ? (visual ? 'INFO' : 'OK') : 'WARN', img.naturalWidth + 'x' + img.naturalHeight + ' in ' + Math.round(performance.now() - t0) + ' ms' + visual); resolve(); };
       img.onerror = () => { add('auto', id, 'Tile: ' + name, 'FAIL', 'image did not load (blocked or offline)'); resolve(); };
       img.src = url;
-      $('tiles').appendChild(img);
+      const fig = document.createElement('figure');
+      const cap = document.createElement('figcaption');
+      cap.textContent = id + ' ' + name;
+      fig.append(img, cap);
+      $('tiles').appendChild(fig);
     });
   }
 
