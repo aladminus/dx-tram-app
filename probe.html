@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Same shape of CSP the app will ship with (PRD PL-3): only the hosts below are reachable. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' blob:; worker-src blob:; style-src 'unsafe-inline'; img-src data: https://server.arcgisonline.com https://services.arcgisonline.com; connect-src https://overpass-api.de https://maps.mail.ru https://overpass.private.coffee https://api3.geo.admin.ch https://api.opentopodata.org https://services.gugik.gov.pl; form-action 'none'; frame-src 'none'">
+<title>dx-tram – Capability Test</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --panel: #ffffff; --text: #1d1d1b; --muted: #666; --border: #dcdcd6;
+    --ok: #1a7f37; --fail: #c62828; --warn: #a15c00; --info: #3a5f9e; --accent: #0e639c; --code: #f0f0ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1b1d; --panel: #242427; --text: #e6e6e6; --muted: #9a9a9a; --border: #3a3a3e;
+      --ok: #4cc26b; --fail: #ff6b6b; --warn: #e0a040; --info: #7aa7f0; --accent: #3794ff; --code: #2e2e32;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, "Segoe UI", sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 28px 0 8px; }
+  .muted { color: var(--muted); }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-top: 12px; overflow-x: auto; }
+  .verdict { font-size: 16px; font-weight: 600; }
+  .verdict.ok { color: var(--ok); } .verdict.fail { color: var(--fail); } .verdict.warn { color: var(--warn); }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; }
+  td.id { white-space: nowrap; color: var(--muted); font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+  td.st { white-space: nowrap; font-weight: 600; }
+  .OK { color: var(--ok); } .FAIL { color: var(--fail); } .WARN { color: var(--warn); } .INFO { color: var(--info); } .SKIP { color: var(--muted); }
+  code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; margin: 4px 8px 4px 0; }
+  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  textarea { width: 100%; height: 220px; background: var(--code); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px; font: 12px/1.4 ui-monospace, Consolas, monospace; }
+  .tiles img { width: 128px; height: 128px; border: 1px solid var(--border); margin: 4px 6px 0 0; background: var(--code); }
+</style>
+</head>
+<body>
+<main>
+  <h1>dx-tram – Capability Test</h1>
+  <p class="muted">Checks whether this browser and network can run the planned single-file dx-tram app (PRD PL-1..PL-3, ST-1, IN-5). Run it in both modes (PRD §3): <b>offline</b> = this file opened by double-click (<code>file://</code>), and <b>online</b> = the copy at <code>https://aladminus.github.io/dx-tram-app/probe.html</code>. In offline mode the Overpass rows are expected to FAIL (no Referer); in online mode they should pass. It contacts only: Esri map tiles, three Overpass (OpenStreetMap) servers, and three elevation services. Nothing is uploaded.</p>
+
+  <div class="panel">
+    <div id="verdict" class="verdict">Running automatic checks…</div>
+    <p id="verdict-detail" class="muted"></p>
+  </div>
+
+  <h2>Step 1 – Automatic checks (run on load, ~30 s)</h2>
+  <div class="panel"><table><thead><tr><th>ID</th><th>Check</th><th>Result</th><th>Detail</th></tr></thead><tbody id="auto"></tbody></table>
+    <div class="tiles" id="tiles"></div>
+  </div>
+
+  <h2>Step 2 – Folder test (needs one click)</h2>
+  <div class="panel">
+    <p>Pick an <b>empty test folder</b> (e.g. create <code>Documents\dx-tram-test</code> first). The test writes a small and a 4 MB file named <code>dx-tram-probe-…</code> (the size of a city's <code>source.json</code>), reads them back and deletes them.</p>
+    <button id="btn-folder">Pick folder and run test</button>
+    <button id="btn-reopen" class="secondary">Re-check stored folder (after reload)</button>
+    <table style="margin-top:10px"><thead><tr><th>ID</th><th>Check</th><th>Result</th><th>Detail</th></tr></thead><tbody id="folder"></tbody></table>
+  </div>
+
+  <h2>Step 3 – Look at the map tiles above</h2>
+  <div class="panel"><p>Four small Warsaw map images should be visible under the Step 1 table (street, gray, dark gray, satellite). A grey box or an "access blocked" picture means the basemap will not work.</p></div>
+
+  <h2>Report</h2>
+  <div class="panel">
+    <button id="btn-copy">Copy report</button><span id="copy-msg" class="muted"></span>
+    <textarea id="report" readonly></textarea>
+  </div>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const results = { auto: [], folder: [] };
+  const errText = (e) => (e && (e.name ? e.name + ': ' : '') + (e.message || String(e))) || String(e);
+
+  function add(group, id, name, status, detail) {
+    const row = { id, name, status, detail: detail || '' };
+    const list = results[group];
+    const i = list.findIndex((r) => r.id === id);
+    if (i >= 0) list[i] = row; else list.push(row);
+    const tbody = $(group);
+    let tr = tbody.querySelector('tr[data-id="' + id + '"]');
+    if (!tr) { tr = document.createElement('tr'); tr.dataset.id = id; tbody.appendChild(tr); }
+    tr.innerHTML = '';
+    for (const [cls, text] of [['id', id], ['', name], ['st ' + status, status], ['', row.detail]]) {
+      const td = document.createElement('td'); if (cls) td.className = cls; td.textContent = text; tr.appendChild(td);
+    }
+    updateVerdict(); renderReport();
+  }
+
+  // ---------- Step 1: automatic ----------
+  async function timedFetch(url, opts, timeoutMs) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    const t0 = performance.now();
+    try {
+      const res = await fetch(url, { ...opts, signal: ctrl.signal });
+      const body = await res.text();
+      return { res, body, ms: Math.round(performance.now() - t0) };
+    } finally { clearTimeout(t); }
+  }
+
+  // A TypeError from fetch() means the browser blocked or could not read the response:
+  // CORS (server did not allow origin "null"), CSP, DNS/proxy failure. The console shows which.
+  function fetchFailDetail(e) {
+    if (e.name === 'AbortError') return 'timeout';
+    return errText(e) + ' (CORS/CSP/proxy/DNS; see DevTools console for which)';
+  }
+
+  const OVERPASS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
+  ];
+  // Tiny query: one tram stop in central Warsaw.
+  const OVERPASS_QUERY = '[out:json][timeout:20];node["railway"="tram_stop"](52.225,21.000,52.235,21.020);out 1;';
+
+  async function probeOverpass(id, url) {
+    add('auto', id, 'Overpass POST ' + new URL(url).host, 'INFO', 'running…');
+    try {
+      const { res, body, ms } = await timedFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'data=' + encodeURIComponent(OVERPASS_QUERY),
+      }, 45000);
+      if (!res.ok) { add('auto', id, 'Overpass POST ' + new URL(url).host, 'WARN', 'HTTP ' + res.status + ' in ' + ms + ' ms: ' + body.slice(0, 120)); return false; }
+      let n = '?';
+      try { n = JSON.parse(body).elements.length; } catch { /* not JSON */ }
+      add('auto', id, 'Overpass POST ' + new URL(url).host, 'OK', 'HTTP 200 in ' + ms + ' ms, ' + n + ' element(s)');
+      return true;
+    } catch (e) {
+      add('auto', id, 'Overpass POST ' + new URL(url).host, 'FAIL', fetchFailDetail(e));
+      return false;
+    }
+  }
+
+  const ELEVATION = [
+    // swisstopo height service (Zurich, LV95 coordinates).
+    ['E1', 'swisstopo height (CH)', 'https://api3.geo.admin.ch/rest/services/height?easting=2683000&northing=1248000&sr=2056'],
+    // Open Topo Data public API, EU-DEM 25 m (Warsaw).
+    ['E2', 'Open Topo Data eudem25m (EU)', 'https://api.opentopodata.org/v1/eudem25m?locations=52.2297,21.0122'],
+    // GUGiK NMT point height (Warsaw, EPSG:2180: x = northing, y = easting). Endpoint to be confirmed.
+    ['E3', 'GUGiK NMT point height (PL)', 'https://services.gugik.gov.pl/nmt/?request=GetHbyXY&x=486600&y=637800'],
+  ];
+
+  async function probeElevation(id, name, url) {
+    add('auto', id, name, 'INFO', 'running…');
+    try {
+      const { res, body, ms } = await timedFetch(url, {}, 20000);
+      add('auto', id, name, res.ok ? 'OK' : 'WARN', 'HTTP ' + res.status + ' in ' + ms + ' ms: ' + body.replace(/\s+/g, ' ').slice(0, 140));
+    } catch (e) {
+      add('auto', id, name, 'INFO', 'not readable from this page: ' + fetchFailDetail(e));
+    }
+  }
+
+  // Warsaw centre at z=13: x=4574, y=2696.
+  const TILES = [
+    ['T1', 'Esri World Street Map', 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/13/2696/4574'],
+    ['T2', 'Esri Light Gray Canvas', 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/13/2696/4574'],
+    ['T3', 'Esri Dark Gray Canvas', 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/13/2696/4574'],
+    ['T4', 'Esri World Imagery', 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/13/2696/4574'],
+  ];
+
+  function probeTile(id, name, url) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const t0 = performance.now();
+      img.alt = name; img.title = name;
+      img.onload = () => { add('auto', id, 'Tile: ' + name, img.naturalWidth === 256 ? 'OK' : 'WARN', img.naturalWidth + 'x' + img.naturalHeight + ' in ' + Math.round(performance.now() - t0) + ' ms'); resolve(); };
+      img.onerror = () => { add('auto', id, 'Tile: ' + name, 'FAIL', 'image did not load (blocked or offline)'); resolve(); };
+      img.src = url;
+      $('tiles').appendChild(img);
+    });
+  }
+
+  function probeWorker() {
+    return new Promise((resolve) => {
+      try {
+        const src = 'onmessage = (e) => { let s = 0; for (let i = 0; i < e.data; i++) s += Math.sqrt(i); postMessage(s > 0); };';
+        const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+        const w = new Worker(url);
+        const timer = setTimeout(() => { add('auto', 'A3', 'Web Worker from Blob URL', 'FAIL', 'no reply in 5 s'); w.terminate(); resolve(); }, 5000);
+        w.onmessage = (e) => { clearTimeout(timer); add('auto', 'A3', 'Web Worker from Blob URL', e.data ? 'OK' : 'FAIL', 'round trip ok'); w.terminate(); resolve(); };
+        w.onerror = (e) => { clearTimeout(timer); add('auto', 'A3', 'Web Worker from Blob URL', 'FAIL', errText(e)); resolve(); };
+        w.postMessage(1e6);
+      } catch (e) { add('auto', 'A3', 'Web Worker from Blob URL', 'FAIL', errText(e)); resolve(); }
+    });
+  }
+
+  function idbOpen() {
+    return new Promise((resolve, reject) => {
+      const r = indexedDB.open('dx-tram-probe', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+    });
+  }
+  async function idbPut(key, val) { const db = await idbOpen(); return new Promise((res, rej) => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(val, key); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
+  async function idbGet(key) { const db = await idbOpen(); return new Promise((res, rej) => { const tx = db.transaction('kv', 'readonly'); const r = tx.objectStore('kv').get(key); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+
+  async function runAuto() {
+    add('auto', 'A0', 'Browser', 'INFO', navigator.userAgent);
+    const mode = location.protocol === 'https:' ? 'online' : location.protocol === 'file:' ? 'offline' : 'other';
+    add('auto', 'A1', 'Mode', mode === 'other' ? 'WARN' : 'OK', mode + ' (' + location.protocol + ', origin ' + location.origin + ')' + (mode === 'other' ? ' – open via file:// or the https copy' : ''));
+    const hasPicker = typeof window.showDirectoryPicker === 'function';
+    add('auto', 'A2', 'Folder access API (showDirectoryPicker)', hasPicker ? 'OK' : 'FAIL', hasPicker ? 'available' : 'missing – app cannot open project folders');
+    await probeWorker();
+    try { await idbPut('probe', 1); add('auto', 'A4', 'IndexedDB', (await idbGet('probe')) === 1 ? 'OK' : 'FAIL', 'write/read ok'); }
+    catch (e) { add('auto', 'A4', 'IndexedDB', 'FAIL', errText(e)); }
+
+    await Promise.all(TILES.map(([id, name, url]) => probeTile(id, name, url)));
+    // Overpass one after another (shared public service, don't burst it).
+    for (let i = 0; i < OVERPASS.length; i++) await probeOverpass('O' + (i + 1), OVERPASS[i]);
+    await Promise.all(ELEVATION.map(([id, name, url]) => probeElevation(id, name, url)));
+    add('auto', 'A9', 'Automatic checks finished', 'INFO', new Date().toISOString());
+  }
+
+  // ---------- Step 2: folder ----------
+  async function exists(dir, name) {
+    try { await dir.getFileHandle(name); return true; } catch (e) { if (e.name === 'NotFoundError') return false; throw e; }
+  }
+
+  async function runFolder() {
+    let dir;
+    try { dir = await window.showDirectoryPicker({ id: 'dx-tram-probe', mode: 'readwrite' }); add('folder', 'F1', 'Pick folder (read/write)', 'OK', dir.name); }
+    catch (e) { add('folder', 'F1', 'Pick folder (read/write)', e.name === 'AbortError' ? 'SKIP' : 'FAIL', errText(e)); return; }
+    try { await idbPut('dir', dir); add('folder', 'F2', 'Store folder handle in IndexedDB', 'OK', 'for "Re-check" after reload'); }
+    catch (e) { add('folder', 'F2', 'Store folder handle in IndexedDB', 'WARN', errText(e)); }
+
+    const small = 'dx-tram-probe-small.json';
+    const big = 'dx-tram-probe-4mb.json';
+    try {
+      if (await exists(dir, small) || await exists(dir, big)) { add('folder', 'F3', 'Folder free of probe files', 'FAIL', 'probe files already exist – pick an empty folder'); return; }
+      add('folder', 'F3', 'Folder free of probe files', 'OK', 'existence check works');
+
+      const fh = await dir.getFileHandle(small, { create: true });
+      let w = await fh.createWritable(); await w.write(JSON.stringify({ probe: true, at: Date.now() })); await w.close();
+      const back = JSON.parse(await (await fh.getFile()).text());
+      add('folder', 'F4', 'Write + read a small JSON file', back.probe ? 'OK' : 'FAIL', 'lastModified ' + new Date((await fh.getFile()).lastModified).toISOString());
+
+      const payload = JSON.stringify({ type: 'FeatureCollection', features: Array.from({ length: 20000 }, (_, i) => ({ type: 'Feature', properties: { '@id': 'way/' + i, railway: 'tram' }, geometry: { type: 'LineString', coordinates: [[21 + i * 1e-6, 52], [21.001, 52.001], [21.002, 52.002]] } })) });
+      const bh = await dir.getFileHandle(big, { create: true });
+      let t0 = performance.now();
+      w = await bh.createWritable(); await w.write(payload); await w.close();
+      const tw = Math.round(performance.now() - t0);
+      t0 = performance.now();
+      const parsed = JSON.parse(await (await bh.getFile()).text());
+      const tr = Math.round(performance.now() - t0);
+      add('folder', 'F5', 'Write + read + parse ' + (payload.length / 1e6).toFixed(1) + ' MB', parsed.features.length === 20000 ? 'OK' : 'FAIL', 'write ' + tw + ' ms, read+parse ' + tr + ' ms');
+
+      await dir.removeEntry(small); await dir.removeEntry(big);
+      add('folder', 'F6', 'Delete probe files', (await exists(dir, small)) || (await exists(dir, big)) ? 'FAIL' : 'OK', 'folder clean again');
+    } catch (e) {
+      add('folder', 'F9', 'Folder test aborted', 'FAIL', errText(e));
+    }
+  }
+
+  async function recheck() {
+    try {
+      const dir = await idbGet('dir');
+      if (!dir) { add('folder', 'R1', 'Stored folder handle after reload', 'SKIP', 'run the folder test first, then reload'); return; }
+      const before = await dir.queryPermission({ mode: 'readwrite' });
+      const after = before === 'granted' ? before : await dir.requestPermission({ mode: 'readwrite' });
+      add('folder', 'R1', 'Stored folder handle after reload', after === 'granted' ? 'OK' : 'WARN', 'permission before click: ' + before + ', after: ' + after);
+    } catch (e) { add('folder', 'R1', 'Stored folder handle after reload', 'FAIL', errText(e)); }
+  }
+
+  // ---------- verdict + report ----------
+  const find = (id) => results.auto.concat(results.folder).find((r) => r.id === id);
+  function updateVerdict() {
+    const v = $('verdict'), d = $('verdict-detail');
+    const need = ['A2', 'A3', 'A4', 'T1'].map(find);
+    const overpassOk = ['O1', 'O2', 'O3'].some((id) => find(id) && find(id).status === 'OK');
+    const overpassDone = ['O1', 'O2', 'O3'].every((id) => find(id) && find(id).detail !== 'running…');
+    if (need.some((r) => r && r.status === 'FAIL')) { v.className = 'verdict fail'; v.textContent = 'A required capability is missing (see FAIL rows).'; }
+    else if (overpassDone && !overpassOk) { v.className = 'verdict warn'; v.textContent = location.protocol === 'file:' ? 'Offline mode works (Overpass failing here is expected: no Referer from file://). Now run the online copy.' : 'App can run, but no Overpass server answered from here (blocked network or servers overloaded; retry later).'; }
+    else if (find('A9')) { v.className = 'verdict ok'; v.textContent = 'Automatic checks passed' + (find('F6') ? ' and the folder test passed.' : '. Now run the folder test (Step 2).'); }
+    else { v.className = 'verdict'; v.textContent = 'Running automatic checks…'; }
+    d.textContent = 'Then copy the report and paste it into the chat.';
+  }
+  function renderReport() {
+    const lines = ['dx-tram capability test, ' + new Date().toISOString()];
+    for (const g of ['auto', 'folder']) for (const r of results[g]) lines.push([r.id, r.status, r.name, r.detail].join(' | '));
+    $('report').value = lines.join('\n');
+  }
+  async function copyReport() {
+    const ta = $('report');
+    try { await navigator.clipboard.writeText(ta.value); $('copy-msg').textContent = ' copied'; }
+    catch { ta.focus(); ta.select(); const ok = document.execCommand && document.execCommand('copy'); $('copy-msg').textContent = ok ? ' copied' : ' select the text and press Ctrl+C'; }
+  }
+
+  $('btn-folder').addEventListener('click', runFolder);
+  $('btn-reopen').addEventListener('click', recheck);
+  $('btn-copy').addEventListener('click', copyReport);
+  runAuto();
+})();
+</script>
+</body>
+</html>
